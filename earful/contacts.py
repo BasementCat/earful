@@ -8,8 +8,8 @@ class ContactInformation(object):
 
 
 class EmailAddress(ContactInformation):
-    def __init__(self, email, *args, **kwargs):
-        super(EmailAddress, self).__init__(*args, **kwargs)
+    def __init__(self, name, email, *args, **kwargs):
+        super(EmailAddress, self).__init__(name, *args, **kwargs)
         self.email = email
 
     def __str__(self):
@@ -17,8 +17,8 @@ class EmailAddress(ContactInformation):
 
 
 class PhoneNumber(ContactInformation):
-    def __init__(self, phone, sms_ok=True, voice_ok=False, *args, **kwargs):
-        super(PhoneNumber, self).__init__(*args, **kwargs)
+    def __init__(self, name, phone, sms_ok=True, voice_ok=False, *args, **kwargs):
+        super(PhoneNumber, self).__init__(name, *args, **kwargs)
         self.phone = phone
         self.sms_ok = sms_ok
         self.voice_ok = voice_ok
@@ -33,8 +33,8 @@ class PhoneNumber(ContactInformation):
 
 
 class HipChat(ContactInformation):
-    def __init__(self, room, username=None, mention=None, notify=None, server=None, *args, **kwargs):
-        super(HipChat, self).__init__(*args, **kwargs)
+    def __init__(self, name, room, username=None, mention=None, notify=None, server=None, *args, **kwargs):
+        super(HipChat, self).__init__(name, *args, **kwargs)
         self.room = room
         self.username = username
         self.server = server
@@ -75,23 +75,24 @@ class Recipient(object):
 
     def contacts(self, of_type=None, include_all=False, **having):
         returned_types = []
-        for contact in sorted(self.contacts, key=lambda v: v.weight):
+        for contact in sorted(self._contacts, key=lambda v: v.weight):
             if of_type and not isinstance(contact, of_type):
                 continue
             for key, value in having.items():
                 if getattr(contact, key, None) != value:
+                    break
+            else:
+                if not include_all and contact.__class__ in returned_types:
                     continue
-            if not include_all and contact.__class__ in returned_types:
-                continue
-            returned_types.append(contact.__class__)
-            yield contact
+                returned_types.append(contact.__class__)
+                yield contact
 
 
 class Group(object):
     def __init__(self, name, groups=None, recipients=None, *args, **kwargs):
         self.name = name
         self._groups = groups or []
-        self._recipients recipients or []
+        self._recipients = recipients or []
 
     def groups(self, recursive=True):
         for group in self._groups:
@@ -101,11 +102,12 @@ class Group(object):
                     yield group_
 
     def recipients(self, recursive=True):
-        for recipient in self.recipients:
+        for recipient in self._recipients:
             yield recipient
-        for group in self.groups(recursive=False):
-            for recipient in group.recipients(recursive=recursive):
-                yield recipient
+        if recursive:
+            for group in self.groups(recursive=False):
+                for recipient in group.recipients(recursive=True):
+                    yield recipient
 
     def contacts(self, of_type=None, include_all=False, recursive=True, **having):
         for recipient in self.recipients(recursive=recursive):
